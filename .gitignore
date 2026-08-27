@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+venv/
+.venv/
+*.egg-info/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Streamlit
+.streamlit/
+
+# Data
+# NOTE: APL_Logistics.csv and the pretrained model artifacts (model.pkl,
+# scaler.pkl, feature_cols.json, metrics.json) are intentionally NOT
+# ignored. Streamlit Community Cloud deploys straight from this GitHub
+# repo with no access to your local machine, so both the dataset and the
+# pretrained model need to live in git — see docs/project-brief.md for
+# why the app loads a pretrained model instead of training on every
+# cold start. Regenerate all four by running scripts/train_model.py.
+!data/README.md

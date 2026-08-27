@@ -1,0 +1,8 @@
+{
+  "auc": 0.7647,
+  "f1": 0.7094,
+  "precision": 0.6545,
+  "recall": 0.7743,
+  "decision_threshold": 0.35,
+  "n_orders": 180519
+}
