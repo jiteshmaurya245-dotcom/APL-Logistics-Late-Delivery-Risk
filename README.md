@@ -5,6 +5,11 @@ Unified Mentor internship project, sponsored by **APL Logistics (KWE Group)**.
 Predicts the probability that an order will arrive late *before* it ships,
 so operations teams can intervene proactively instead of reacting after a
 delay has already happened.
+**Live dashboard:** https://apl-logistics-late-delivery-risk-6tbthvh57qvapvqpjvvtcn.streamlit.app/
+**Research paper:** [file:///C:/Users/Jitesh%20Maurya/Downloads/APL_Logistics_Research_Paper.pdf](file:///C:/Users/Jitesh%20Maurya/Downloads/APL_Logistics_Research_Paper.pdf)
+**Executive summary:** [file:///C:/Users/Jitesh%20Maurya/Downloads/APL_Logistics_Executive_Summary.pdf](file:///C:/Users/Jitesh%20Maurya/Downloads/APL_Logistics_Executive_Summary.pdf)
+
+
 
 ## Repo structure
 
