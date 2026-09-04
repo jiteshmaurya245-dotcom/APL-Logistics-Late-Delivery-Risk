@@ -125,20 +125,21 @@ section[data-testid="stSidebar"] hr { border-color: #2E3247 !important; }
 /* Tabs */
 .stTabs [data-baseweb="tab-list"] {
     background: #FFFFFF !important;
-    border-radius: 10px !important;
-    padding: 4px !important;
+    border-radius: 999px !important;
+    padding: 5px !important;
     border: 1px solid #E8EAF0 !important;
     gap: 2px !important;
     box-shadow: 0 1px 3px rgba(0,0,0,0.04) !important;
 }
 .stTabs [data-baseweb="tab"] {
-    border-radius: 7px !important;
-    padding: 8px 18px !important;
+    border-radius: 999px !important;
+    padding: 9px 20px !important;
     font-size: 13px !important;
     font-weight: 500 !important;
     color: #6B7280 !important;
     border: none !important;
     background: transparent !important;
+    transition: background 0.2s ease, color 0.2s ease !important;
 }
 .stTabs [aria-selected="true"] {
     background: #1A1D2E !important;
