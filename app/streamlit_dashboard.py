@@ -325,10 +325,10 @@ def load_and_train():
     scored['risk_category'] = pd.cut(probs, bins=[0,0.35,0.65,1.0], labels=['Low','Medium','High'], include_lowest=True)
     scored['pred']          = preds
     fi = pd.Series(rf.feature_importances_, index=feature_cols).sort_values(ascending=False)
-    return df_raw, scored, metrics, fi, rf, scaler, feature_cols, num_cols
+    return df_raw, scored, metrics, fi, rf, scaler, feature_cols, num_cols, y_test, probs
 
 with st.spinner("Initialising risk intelligence engine..."):
-    df_raw, scored, metrics, feat_imp, model, scaler, feature_cols, num_cols = load_and_train()
+    df_raw, scored, metrics, feat_imp, model, scaler, feature_cols, num_cols, y_test_full, probs_full = load_and_train()
 
 # ─────────────────────────────────────────
 # SIDEBAR
@@ -563,6 +563,60 @@ with tab1:
               </div>
             </div>""", unsafe_allow_html=True)
 
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # ── Row 4: ROC Curve ──
+    col_h, col_i = st.columns([1.3, 1])
+
+    with col_h:
+        st.markdown('<div class="section-title">ROC Curve</div>', unsafe_allow_html=True)
+        from sklearn.metrics import roc_curve, auc as sk_auc
+        fpr, tpr, roc_thresholds = roc_curve(y_test_full, probs_full)
+        roc_auc_val = sk_auc(fpr, tpr)
+
+        fig_roc = go.Figure()
+        fig_roc.add_trace(go.Scatter(
+            x=fpr, y=tpr, mode='lines', name='Random Forest',
+            line=dict(color='#378ADD', width=2.5),
+            fill='tozeroy', fillcolor='rgba(55,138,221,0.08)',
+            hovertemplate='FPR: %{x:.3f}<br>TPR: %{y:.3f}<extra></extra>'
+        ))
+        fig_roc.add_trace(go.Scatter(
+            x=[0,1], y=[0,1], mode='lines', name='Random baseline (AUC 0.5)',
+            line=dict(color='#9CA3AF', width=1.5, dash='dash'),
+            hoverinfo='skip'
+        ))
+        thresh_idx = (np.abs(roc_thresholds - DECISION_THRESHOLD)).argmin()
+        fig_roc.add_trace(go.Scatter(
+            x=[fpr[thresh_idx]], y=[tpr[thresh_idx]], mode='markers',
+            marker=dict(color='#E24B4A', size=10, symbol='circle'),
+            name=f'Operating point (threshold={DECISION_THRESHOLD})',
+            hovertemplate=f'Decision threshold {DECISION_THRESHOLD}<br>FPR: %{{x:.3f}}<br>TPR: %{{y:.3f}}<extra></extra>'
+        ))
+        fig_roc.update_layout(**CHART_LAYOUT, height=300,
+                              xaxis=dict(title='False Positive Rate', range=[0,1], gridcolor='#F3F4F6'),
+                              yaxis=dict(title='True Positive Rate', range=[0,1], gridcolor='#F3F4F6'),
+                              legend=dict(orientation='h', y=-0.25, x=0.5, xanchor='center', font=dict(size=10)))
+        st.plotly_chart(fig_roc, width='stretch')
+
+    with col_i:
+        st.markdown('<div class="section-title">Reading the ROC Curve</div>', unsafe_allow_html=True)
+        st.markdown(f"""
+        <div style="font-size:13px;color:#374151;line-height:1.9;">
+          <div>Area under the curve (AUC): <b>{roc_auc_val:.4f}</b></div>
+          <div style="margin-top:8px;">
+            The curve shows the trade-off between catching true late deliveries
+            (True Positive Rate) and raising false alarms (False Positive Rate)
+            as the decision threshold changes.
+          </div>
+          <div style="margin-top:10px;padding-top:10px;border-top:1px solid #F3F4F6;">
+            The red dot marks where the model currently operates, at a decision
+            threshold of <b>{DECISION_THRESHOLD}</b> — recalibrated from the default
+            0.5 because missing a genuinely late order costs more than an
+            unnecessary check-in on a false alarm.
+          </div>
+        </div>""", unsafe_allow_html=True)
+
 # ════════════════════════════════════════════════════════════
 # TAB 2 — ORDER-LEVEL RISK
 # ════════════════════════════════════════════════════════════
@@ -706,6 +760,49 @@ with tab2:
         g_col = st.columns([1,2,1])
         with g_col[1]:
             st.plotly_chart(fig_gauge, width='stretch')
+
+        # ── SHAP explanation for this prediction ──
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown('<div class="section-title">Why This Score? (SHAP Explanation)</div>', unsafe_allow_html=True)
+
+        import shap
+        explainer = shap.TreeExplainer(model)
+        shap_vals = explainer.shap_values(inp_df)
+        if shap_vals.ndim == 3:
+            sv = shap_vals[0, :, 1]
+        else:
+            sv = shap_vals[0]
+
+        labels_map_shap = {
+            'Order Profit Per Order':'Order Profit', 'Benefit per order':'Benefit / Order',
+            'Order Item Profit Ratio':'Profit Ratio', 'Days for shipment (scheduled)':'Scheduled Days',
+            'low_scheduled_days':'Tight Schedule ≤2d', 'Order Item Total':'Item Total',
+            'Sales per customer':'Customer Sales', 'Order Item Discount':'Item Discount',
+            'shipping_pressure':'Shipping Pressure', 'Order Item Discount Rate':'Discount Rate',
+        }
+
+        shap_df = pd.DataFrame({'feature': feature_cols, 'shap_value': sv})
+        shap_df['abs_val'] = shap_df['shap_value'].abs()
+        shap_df = shap_df.sort_values('abs_val', ascending=False).head(8)
+        shap_df['label'] = shap_df['feature'].apply(lambda f: labels_map_shap.get(f, f[:30]))
+
+        max_abs = shap_df['abs_val'].max()
+        for _, row in shap_df.iterrows():
+            pct = (row['abs_val'] / max_abs * 100) if max_abs > 0 else 0
+            color = '#E24B4A' if row['shap_value'] > 0 else '#1D9E75'
+            direction = '↑ increases risk' if row['shap_value'] > 0 else '↓ decreases risk'
+            st.markdown(f"""
+            <div class="fi-row">
+              <div class="fi-name">{row['label']}</div>
+              <div style="display:flex;align-items:center;gap:8px;">
+                <div class="fi-bar-bg" style="flex:1">
+                  <div class="fi-bar-fill" style="width:{pct:.0f}%;background:{color};"></div>
+                </div>
+                <span style="font-size:11px;font-family:'DM Mono';color:{color};width:150px;text-align:right">{direction} ({row['shap_value']:+.3f})</span>
+              </div>
+            </div>""", unsafe_allow_html=True)
+
+        st.caption("SHAP values show how much each feature pushed this specific order's risk score up or down, relative to the model's average prediction.")
 
 # ════════════════════════════════════════════════════════════
 # TAB 3 — REGION & MODE
